@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+data/raw/cache/
+data/index*/
+data/cache/
+data/processed/
+data/gold/gold_set.jsonl
+data/gold/human_labels.jsonl
+results/*.json
+results/*.md
+!results/.gitkeep
+.DS_Store

@@ -1,0 +1,22 @@
+// Gold set template. Copy to gold_set.jsonl and replace with real questions.
+// One JSON object per line. Lines starting with // are ignored.
+//
+// Fields:
+//   question_id          unique string
+//   question             the user's question, verbatim where possible
+//   relevant_chunk_ids   chunk ids that actually answer it (from your index)
+//   source               forum | faq | exam | practitioner | llm_generated
+//   question_type        factual | procedural | conditional | temporal | multi_hop | unanswerable
+//   split                dev (tune here) | test (report here)
+//   reference_answer     optional, needed for correctness judging
+//   graded_relevance     optional {chunk_id: gain}, used by nDCG
+//   as_of                optional ISO date, required for temporal questions
+//   notes                why this question is here / what makes it hard
+//
+// Validate with:  python -c "from src.eval.goldset import *; print(validate_gold_set(load_gold_set('data/gold/gold_set.jsonl')))"
+
+{"question_id": "q001", "question": "Can I claim input tax credit on a hotel stay booked for a business trip?", "relevant_chunk_ids": ["act-s17::sec17::0"], "source": "forum", "question_type": "conditional", "split": "test", "reference_answer": "No. Section 17 blocks credit on food and beverages and on leasing or renting of motor vehicles, and accommodation-related inward supplies are restricted.", "notes": "Acronym-free phrasing; the ITC variant of this question is q002."}
+{"question_id": "q002", "question": "Is ITC available on hotel accommodation?", "relevant_chunk_ids": ["act-s17::sec17::0"], "source": "forum", "question_type": "conditional", "split": "dev", "notes": "Same intent as q001 but acronym-heavy. Keep the pair split across dev/test to see whether query rewriting generalises."}
+{"question_id": "q003", "question": "What is the GST rate on hotel accommodation above 7500 rupees per night?", "relevant_chunk_ids": ["notif-20-2019::fixed::0", "notif-11-2017::fixed::0"], "graded_relevance": {"notif-20-2019::fixed::0": 3.0, "notif-11-2017::fixed::0": 1.0}, "source": "forum", "question_type": "temporal", "split": "test", "as_of": "2024-04-01", "reference_answer": "12 per cent, following Notification 20/2019-CT(R) with effect from 1 October 2019.", "notes": "The 2017 notification says 18 per cent and has been amended. Retrieving it above the amendment is a correctness failure, not just a ranking failure."}
+{"question_id": "q004", "question": "By what date must input tax credit be claimed for an invoice?", "relevant_chunk_ids": ["act-s16::sec16::0"], "source": "faq", "question_type": "factual", "split": "test", "reference_answer": "30 November following the end of the financial year to which the invoice pertains."}
+{"question_id": "q005", "question": "What is the GST treatment of NFT royalties paid to an overseas creator?", "relevant_chunk_ids": [], "source": "practitioner", "question_type": "unanswerable", "split": "test", "notes": "Deliberately outside the corpus. Measures abstention. You need 10-20 of these."}

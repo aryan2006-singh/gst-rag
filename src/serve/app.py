@@ -21,9 +21,10 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.retrieve.pipeline import ABLATION_LADDER, PipelineConfig
@@ -196,42 +197,6 @@ async def query(request: QueryRequest):
     )
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index_page():
-    return """<!doctype html>
-<html><head><meta charset="utf-8"><title>gst-rag</title>
-<style>
- body{font:15px/1.55 system-ui,sans-serif;max-width:820px;margin:40px auto;padding:0 16px}
- input,button{font:inherit;padding:8px}
- input{width:74%} button{width:22%}
- .hit{border-left:3px solid #ccc;padding:8px 12px;margin:12px 0;background:#fafafa}
- .superseded{border-color:#c00} .amended{border-color:#e90}
- .badge{font-size:12px;padding:2px 6px;border-radius:3px;background:#eee}
- .trace{color:#666;font-size:13px;font-family:ui-monospace,monospace}
- .warn{background:#fff4e5;border-left:3px solid #e90;padding:8px 12px;margin:8px 0}
-</style></head><body>
-<h1>GST retrieval</h1>
-<p>Retrieval only — citations with legal status, no generated answer.</p>
-<div><input id="q" placeholder="Can I claim ITC on hotel accommodation?"
- onkeydown="if(event.key==='Enter')go()"><button onclick="go()">Search</button></div>
-<div id="out"></div>
-<script>
-async function go(){
-  const q=document.getElementById('q').value; if(!q)return;
-  const out=document.getElementById('out'); out.innerHTML='searching...';
-  const r=await fetch('/query',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({question:q,top_k:5})});
-  const d=await r.json();
-  let html=`<p class=trace>rewritten: ${d.rewritten_query}<br>`+
-    `${JSON.stringify(d.trace.stage_latency_ms)} total ${d.trace.total_ms}ms `+
-    `(${d.trace.config})</p>`;
-  for(const w of d.warnings) html+=`<div class=warn>${w}</div>`;
-  for(const c of d.citations){
-    html+=`<div class="hit ${c.status}"><span class=badge>${c.status}</span> `+
-      `<b>${c.doc_id}</b>${c.section?' section '+c.section:''} `+
-      `<span class=trace>score ${c.score}${c.published?' · '+c.published:''}</span>`+
-      `<p>${c.snippet}</p></div>`;
-  }
-  out.innerHTML=html;
-}
-</script></body></html>"""
+FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

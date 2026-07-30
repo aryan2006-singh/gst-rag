@@ -54,7 +54,7 @@ don't exist in the index, and warns when there's no held-out test split.
 
 ```bash
 pip install numpy pytest        # that's all the demo needs
-make test                       # 110 tests, offline
+make test                       # 117 tests, offline
 make demo                       # full ablation on a built-in fixture corpus
 ```
 
@@ -88,7 +88,7 @@ make scrape            # rate-limited 1 req / 2s, everything cached to disk
 make extract           # PDFs -> text, plus results/extraction_report.md
 make build             # chunk + embed  (bge-small on CPU)
 make eval              # -> RESULTS.md
-make serve             # http://localhost:8000
+make serve             # builds frontend/ (npm install && npm run build), then http://localhost:8000
 ```
 
 Everything runs on CPU with no API keys. Embeddings are `BAAI/bge-small-en-v1.5`,
@@ -199,7 +199,8 @@ src/index/         chunking (3 strategies), BM25 (own impl), embedders, build
 src/retrieve/      fusion, reranking, query rewriting, supersession/recency
 src/ingest/        CBIC scraper (rate-limited, cached), PDF extraction taxonomy
 src/serve/         FastAPI + traced retrieval + status-labelled citations
-tests/             110 tests, all offline
+frontend/          React + Vite + TypeScript + Tailwind UI, served by src/serve/
+tests/             117 tests, all offline
 ```
 
 ## Test suite
@@ -207,8 +208,9 @@ tests/             110 tests, all offline
 ```
 tests/test_metrics.py            24  every metric vs a hand-computed value
 tests/test_stats_and_agreement.py 25  CIs, permutation tests, kappa properties
-tests/test_pipeline.py            36  tokenizer, BM25, fusion, chunking, e2e
+tests/test_pipeline.py            38  tokenizer, BM25, fusion, chunking, e2e, as_of
 tests/test_eval_harness.py        25  gold-set guardrails, ablation, judges
+tests/test_serve.py               5  request helpers, warnings, route precedence
 ```
 
 The tests worth reading first, because they encode the ideas:

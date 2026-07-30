@@ -3,7 +3,7 @@ EMBEDDER  ?= sentence-transformers
 INDEX     ?= data/index
 GOLD      ?= data/gold/gold_set.jsonl
 
-.PHONY: install test demo scrape extract build eval eval-dev validate-judge serve clean
+.PHONY: install test demo scrape extract build eval eval-dev validate-judge frontend serve clean
 
 install:
 	pip install -r requirements.txt
@@ -55,7 +55,10 @@ sweep-chunking:
 validate-judge:
 	python scripts/validate_judge.py score --labels data/gold/human_labels.jsonl
 
-serve:
+frontend:
+	cd frontend && npm install && npm run build
+
+serve: frontend
 	INDEX_DIR=$(INDEX) uvicorn src.serve.app:app --host 0.0.0.0 --port 8000
 
 clean:

@@ -47,3 +47,18 @@ def test_variant_summary_reports_config_flags():
 def test_variant_summary_covers_every_ablation_row():
     names = {variant_summary(c)["name"] for c in ABLATION_LADDER}
     assert names == {c.name for c in ABLATION_LADDER}
+
+
+def test_api_routes_are_registered_before_the_static_mount():
+    # Guards against the frontend's StaticFiles mount at "/" ever being
+    # registered ahead of the API routes, which would shadow /health,
+    # /variants, and /query. No HTTP client or built index required -- just
+    # inspects the route list FastAPI already built at import time.
+    from starlette.routing import Mount
+
+    from src.serve.app import app
+
+    paths = [getattr(route, "path", None) for route in app.routes]
+    mount_index = next(i for i, route in enumerate(app.routes) if isinstance(route, Mount))
+    for api_path in ("/health", "/variants", "/query"):
+        assert paths.index(api_path) < mount_index

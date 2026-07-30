@@ -5,7 +5,12 @@ async function parseJsonOrThrow<T>(response: Response): Promise<T> {
     let detail = response.statusText;
     try {
       const body = await response.json();
-      detail = body.detail ?? detail;
+      const raw = body.detail;
+      detail = typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw.map((e: any) => e.msg ?? String(e)).join("; ")
+          : detail;
     } catch {
       // response body wasn't JSON; fall back to statusText
     }

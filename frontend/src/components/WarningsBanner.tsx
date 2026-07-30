@@ -8,7 +8,10 @@ export default function WarningsBanner({ warnings }: WarningsBannerProps) {
   return (
     <div className="mt-4 space-y-2">
       {warnings.map((warning) => {
-        const severe = warning.includes("superseded") || warning.includes("no in-force");
+        const severe =
+          warning.includes("superseded") ||
+          warning.includes("no in-force") ||
+          warning.includes("abstain");
         return (
           <div
             key={warning}

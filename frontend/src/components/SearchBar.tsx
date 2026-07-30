@@ -17,7 +17,7 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (question.trim()) {
+    if (question.trim().length >= 3) {
       onSearch(question.trim());
     }
   }
@@ -36,7 +36,7 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
         />
         <button
           type="submit"
-          disabled={loading || !question.trim()}
+          disabled={loading || question.trim().length < 3}
           className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white
                      disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900"
         >

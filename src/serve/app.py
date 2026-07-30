@@ -122,6 +122,12 @@ async def variants():
     return [variant_summary(c) for c in ABLATION_LADDER]
 
 
+# NOTE: the exact wording of the warning strings below (here and in the
+# supersession/amendment branch in `query()`) is a UI contract with
+# frontend/src/components/WarningsBanner.tsx, which substring-matches these
+# messages to decide red (severe) vs amber styling. Changing the wording
+# without updating that component's substring checks will silently change a
+# warning's rendered severity.
 def empty_result_warning(as_of: date | None) -> str:
     if as_of is not None:
         return f"no in-force provision found for {as_of.isoformat()}"
@@ -159,6 +165,9 @@ async def query(request: QueryRequest):
         metadata = hit.chunk.metadata or {}
         notification_id = metadata.get("notification_id")
         status = graph.status(notification_id) if notification_id else "unknown"
+        # Wording here is also a WarningsBanner.tsx substring-matching contract
+        # (see the note above empty_result_warning) — keep "superseded" and
+        # "amended" in these messages if you edit them.
         if status == "superseded":
             warnings.append(
                 f"{notification_id} has been superseded; check the successor before relying on it"
@@ -180,6 +189,13 @@ async def query(request: QueryRequest):
     if not result.hits:
         warnings.append(empty_result_warning(as_of_date))
 
+    if as_of_date is not None:
+        undated = sum(1 for c in citations if c.published is None)
+        if undated:
+            warnings.append(
+                f"{undated} result(s) have no publication date and were not filtered by as-of"
+            )
+
     return QueryResponse(
         question=request.question,
         rewritten_query=result.rewritten_query,
@@ -200,3 +216,8 @@ async def query(request: QueryRequest):
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+else:
+    print(
+        f"frontend/dist not found at {FRONTEND_DIST} — API only; "
+        "run 'make frontend' or 'cd frontend && npm install && npm run build'"
+    )

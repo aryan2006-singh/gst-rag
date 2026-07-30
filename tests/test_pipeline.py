@@ -285,3 +285,26 @@ def test_gold_set_chunk_ids_exist_in_the_index(pipeline):
     for question in gold_questions():
         missing = [c for c in question.relevant_chunk_ids if c not in known]
         assert not missing, f"{question.question_id} references missing chunks: {missing}"
+
+
+def test_pipeline_search_as_of_excludes_documents_published_after(pipeline):
+    from datetime import date
+
+    result = pipeline.search(
+        "GST rate on hotel accommodation above 7500 rupees",
+        top_k=10,
+        as_of=date(2018, 1, 1),
+    )
+    assert "notif-20-2019::fixed::0" not in result.ranked_ids
+    assert "as_of_filter" in result.latency_ms
+
+
+def test_pipeline_search_as_of_can_return_no_hits(pipeline):
+    from datetime import date
+
+    result = pipeline.search(
+        "GST rate on hotel accommodation above 7500 rupees",
+        top_k=10,
+        as_of=date(2000, 1, 1),
+    )
+    assert result.hits == []

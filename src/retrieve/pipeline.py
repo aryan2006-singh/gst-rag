@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from datetime import date
 
 import numpy as np
 
@@ -118,7 +119,9 @@ class RetrievalPipeline:
         return self.bm25.search(query, k=k)
 
     # -------------------------------------------------------------------- main
-    def search(self, query: str, top_k: int | None = None) -> RetrievalResult:
+    def search(
+        self, query: str, top_k: int | None = None, as_of: date | None = None
+    ) -> RetrievalResult:
         config = self.config
         k = top_k or config.top_k
         latency: dict[str, float] = {}
@@ -161,6 +164,13 @@ class RetrievalPipeline:
             start = time.perf_counter()
             fused = apply_recency_boost(fused, self.by_id, weight=config.recency_boost)
             latency["recency"] = (time.perf_counter() - start) * 1000
+
+        if as_of is not None:
+            from src.retrieve.recency import filter_as_of
+
+            start = time.perf_counter()
+            fused = filter_as_of(fused, self.by_id, as_of)
+            latency["as_of_filter"] = (time.perf_counter() - start) * 1000
 
         if config.rerank and self.reranker is not None:
             start = time.perf_counter()

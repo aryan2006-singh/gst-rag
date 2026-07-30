@@ -56,7 +56,10 @@ def test_api_routes_are_registered_before_the_static_mount():
     # inspects the route list FastAPI already built at import time.
     from starlette.routing import Mount
 
-    from src.serve.app import app
+    from src.serve.app import FRONTEND_DIST, app
+
+    if not FRONTEND_DIST.exists():
+        pytest.skip("frontend/dist not built; nothing to check route order against")
 
     paths = [getattr(route, "path", None) for route in app.routes]
     mount_index = next(i for i, route in enumerate(app.routes) if isinstance(route, Mount))

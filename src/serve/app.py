@@ -20,10 +20,13 @@ from __future__ import annotations
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+
+from src.retrieve.pipeline import ABLATION_LADDER, PipelineConfig
 
 STATE: dict = {}
 
@@ -57,7 +60,7 @@ class QueryResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from src.index.build import load_index
-    from src.retrieve.pipeline import ABLATION_LADDER, RetrievalPipeline
+    from src.retrieve.pipeline import RetrievalPipeline
     from src.retrieve.query_rewrite import rewrite
     from src.retrieve.recency import build_supersession_graph
 
@@ -102,6 +105,28 @@ async def health():
     }
 
 
+def variant_summary(config: PipelineConfig) -> dict:
+    return {
+        "name": config.name,
+        "use_bm25": config.use_bm25,
+        "use_dense": config.use_dense,
+        "rerank": config.rerank,
+        "query_rewrite": config.query_rewrite,
+        "recency_boost": config.recency_boost,
+    }
+
+
+@app.get("/variants")
+async def variants():
+    return [variant_summary(c) for c in ABLATION_LADDER]
+
+
+def empty_result_warning(as_of: date | None) -> str:
+    if as_of is not None:
+        return f"no in-force provision found for {as_of.isoformat()}"
+    return "no passages retrieved; the system should abstain"
+
+
 @app.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
     pipeline = STATE.get("pipeline")
@@ -114,8 +139,17 @@ async def query(request: QueryRequest):
             raise HTTPException(400, f"unknown variant; have {sorted(STATE['variants'])}")
         pipeline = pipeline.with_config(config)
 
+    as_of_date: date | None = None
+    if request.as_of:
+        try:
+            as_of_date = date.fromisoformat(request.as_of)
+        except ValueError:
+            raise HTTPException(
+                400, f"invalid as_of date: {request.as_of!r}; expected YYYY-MM-DD"
+            )
+
     started = time.perf_counter()
-    result = pipeline.search(request.question, top_k=request.top_k)
+    result = pipeline.search(request.question, top_k=request.top_k, as_of=as_of_date)
     graph = STATE["graph"]
 
     warnings: list[str] = []
@@ -143,7 +177,7 @@ async def query(request: QueryRequest):
         )
 
     if not result.hits:
-        warnings.append("no passages retrieved; the system should abstain")
+        warnings.append(empty_result_warning(as_of_date))
 
     return QueryResponse(
         question=request.question,

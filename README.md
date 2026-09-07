@@ -88,7 +88,7 @@ make scrape            # rate-limited 1 req / 2s, everything cached to disk
 make extract           # PDFs -> text, plus results/extraction_report.md
 make build             # chunk + embed  (bge-small on CPU)
 make eval              # -> RESULTS.md
-make serve             # builds frontend/ (npm install && npm run build), then http://localhost:8000
+make serve             # builds frontend/ (npm install && npm run build), then https://gst-rag-dv7x.onrender.com
 ```
 
 Everything runs on CPU with no API keys. Embeddings are `BAAI/bge-small-en-v1.5`,

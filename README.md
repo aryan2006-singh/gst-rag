@@ -3,10 +3,10 @@
 Retrieval over Indian GST law, built around an evaluation harness rather than a
 chatbot.
 
-> **Headline (fill in from your own run):** hybrid BM25 + dense retrieval with
-> cross-encoder reranking improved Recall@5 from _A_ to _B_ (+_D_, 95% CI
-> [_lo_, _hi_], p=_p_) over a dense-only baseline on _N_ hand-labelled questions.
-> LLM-judge faithfulness validated at Cohen's kappa = _k_ against 50 human labels.
+> **Status:** the evaluation harness, the retrieval pipeline and 117 offline tests
+> are built. Results on a real hand-labelled gold set are not published in this
+> repo yet. The only run committed here is the 9-question fixture demo below
+> (`make demo`), where nothing reaches statistical significance.
 
 ```
 CBIC PDFs ──▶ extract ──▶ chunk ──▶ ┌── BM25 ────┐
@@ -164,7 +164,8 @@ any number in the table.
 
 ## Results table format
 
-`make eval` generates `RESULTS.md`:
+`make eval` generates `RESULTS.md`. The table below shows only the **format**;
+its numbers are illustrative, not results from this project:
 
 | Pipeline variant | recall@5 | mrr | ndcg@10 | p95 latency | vs baseline |
 |---|---|---|---|---|---|

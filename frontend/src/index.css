@@ -119,9 +119,23 @@ body {
 .float { animation: float 7s ease-in-out infinite; }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 
-/* Scroll reveal */
-.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s ease; }
-.reveal.in { opacity: 1; transform: none; }
+/* Scroll reveal: text zooms up into focus each time it enters the view, and
+   recedes again when it leaves, so it replays on every pass. */
+.reveal {
+  opacity: 0;
+  transform: perspective(1000px) translateY(40px) scale(0.86);
+  filter: blur(8px);
+  transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.9s ease;
+}
+.reveal.in { opacity: 1; transform: none; filter: none; }
+
+/* Hero text zooms toward the viewer and fades as you scroll past it. */
+.hero-zoom {
+  transform: scale(calc(1 + var(--scroll, 0) * 0.55));
+  opacity: calc(1 - var(--scroll, 0) * 1.25);
+  transform-origin: 25% 50%;
+  will-change: transform, opacity;
+}
 
 /* Motion off: set from the OS preference, overridable with the nav switch. */
 .reduce-motion { scroll-behavior: auto; }

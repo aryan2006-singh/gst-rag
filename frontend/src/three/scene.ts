@@ -249,6 +249,11 @@ export function createScene({ canvas, reducedMotion, windows, anchor }: Options)
     rig.rotation.y = cur.ry;
     rig.scale.setScalar(cur.s);
 
+    // Scrolling through the hero dollies the camera in, so the scene zooms toward you.
+    const zoom = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1) || 0;
+    const camZ = 11 - zoom * 4.5;
+    camera.position.z += (camZ - camera.position.z) * k;
+
     const lk = reducedMotion ? 0 : 1 - Math.pow(0.02, dt);
     lean.rotation.y += (pointer.x * 0.35 - lean.rotation.y) * lk;
     lean.rotation.x += (pointer.y * 0.25 - lean.rotation.x) * lk;

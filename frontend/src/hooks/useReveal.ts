@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 
-/** Adds `.in` to every `.reveal` element once it scrolls into view. */
+/** Toggles `.in` on every `.reveal` element as it enters and leaves the view, so the zoom replays. */
 export function useReveal(deps: unknown[] = []) {
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>(".reveal:not(.in)"));
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
     if (!("IntersectionObserver" in window)) {
       els.forEach((el) => el.classList.add("in"));
       return;
@@ -11,13 +11,10 @@ export function useReveal(deps: unknown[] = []) {
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in");
-            io.unobserve(entry.target);
-          }
+          entry.target.classList.toggle("in", entry.isIntersecting);
         });
       },
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -31,7 +28,7 @@ export function useScrollVar() {
     let frame = 0;
     const update = () => {
       frame = 0;
-      const p = Math.min(window.scrollY / window.innerHeight, 1.5);
+      const p = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1.5) || 0;
       document.documentElement.style.setProperty("--scroll", p.toFixed(3));
     };
     const onScroll = () => {
@@ -39,6 +36,10 @@ export function useScrollVar() {
     };
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 }

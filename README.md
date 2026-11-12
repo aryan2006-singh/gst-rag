@@ -91,6 +91,31 @@ make eval              # -> RESULTS.md
 make serve             # builds frontend/ (npm install && npm run build), then https://gst-rag-dv7x.onrender.com
 ```
 
+### Starter corpus and hand-downloaded PDFs
+
+`www.cbic.gov.in` is often unreachable from servers (its TLS chain is
+incomplete), so there is a second route. `data/sources/cbic_gst_starter.jsonl`
+lists 40 English documents from `cbic-gst.gov.in`: the CGST Rules and their
+chapters, 2024-25 circulars and instructions, registration FAQs, and the 2023
+amendment acts. The extracted text is committed as
+`data/corpus/cbic_gst_starter.documents.jsonl.gz`, and that's what the deployed
+app searches.
+
+```bash
+make starter-index EMBEDDER=hashing INDEX=data/index_cbic   # no downloads at all
+
+# or rebuild it from the PDFs, or from any folder of PDFs you downloaded yourself
+make fetch-starter     # robots.txt checked, 1 req / 2s, writes data/raw/pdfs/
+make ingest-local      # PDF_DIR=... ; folder -> data/raw/manifest.jsonl
+make extract build
+```
+
+`make ingest-local` reads an optional `sources.jsonl` next to the PDFs
+(`{"file", "url", "title", "doc_type", "published"}`, all but `file`
+optional). A missing publication date is read from the document header
+("dated the 10th September, 2024"), so as-of filtering works on hand-downloaded
+files too.
+
 Everything runs on CPU with no API keys. Embeddings are `BAAI/bge-small-en-v1.5`,
 reranking is `cross-encoder/ms-marco-MiniLM-L-6-v2`, and the judge is either
 heuristic or a small local NLI cross-encoder.
@@ -198,10 +223,10 @@ src/eval/          ← the project
   run_eval.py      ablation runner -> RESULTS.md
 src/index/         chunking (3 strategies), BM25 (own impl), embedders, build
 src/retrieve/      fusion, reranking, query rewriting, supersession/recency
-src/ingest/        CBIC scraper (rate-limited, cached), PDF extraction taxonomy
+src/ingest/        CBIC scraper (rate-limited, cached), local-PDF manifests, PDF extraction taxonomy
 src/serve/         FastAPI + traced retrieval + status-labelled citations
 frontend/          React + Vite + TypeScript + Tailwind UI, served by src/serve/
-tests/             117 tests, all offline
+tests/             150 tests, all offline
 ```
 
 ## Test suite
@@ -212,6 +237,8 @@ tests/test_stats_and_agreement.py 25  CIs, permutation tests, kappa properties
 tests/test_pipeline.py            38  tokenizer, BM25, fusion, chunking, e2e, as_of
 tests/test_eval_harness.py        25  gold-set guardrails, ablation, judges
 tests/test_serve.py               5  request helpers, warnings, route precedence
+tests/test_serve_api.py           6  HTTP: stage scores, skipped stages, load failures
+tests/test_ingest_local.py       27  local-PDF manifests, circular ids, header dates
 ```
 
 The tests worth reading first, because they encode the ideas:
@@ -226,8 +253,9 @@ The tests worth reading first, because they encode the ideas:
 ## Data and licence
 
 CBIC circulars and notifications are Government of India publications, fetched
-from cbic.gov.in and redistributed here only as derived indices, not as bulk
-copies. Check `robots.txt` before crawling and keep the 2s delay. This is a
+from cbic.gov.in and cbic-gst.gov.in. The starter corpus commits extracted text
+of 40 of them, each with its source URL; the PDFs themselves are not
+committed. Check `robots.txt` before crawling and keep the 2s delay. This is a
 research project and is **not legal advice**.
 
 Code: MIT.

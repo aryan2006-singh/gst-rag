@@ -47,6 +47,10 @@ class Citation(BaseModel):
     snippet: str
     section: str | None = None
     published: str | None = None
+    # Score this chunk got at each stage it appeared in (bm25, dense, fusion,
+    # recency, rerank). A stage is missing when the chunk wasn't in that
+    # stage's candidate list.
+    stage_scores: dict[str, float] = Field(default_factory=dict)
 
 
 class QueryResponse(BaseModel):
@@ -60,6 +64,19 @@ class QueryResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # A failed index load should be visible on /health, not hidden behind a
+    # status that says "loading" forever or a container that crash-loops
+    # without telling anyone why.
+    try:
+        load_state()
+    except Exception as exc:  # noqa: BLE001 - surfaced via /health and /query
+        STATE["error"] = f"{type(exc).__name__}: {exc}"
+        STATE["started"] = time.time()
+        print(f"index load failed: {STATE['error']}")
+    yield
+
+
+def load_state() -> None:
     from src.index.build import load_index
     from src.retrieve.pipeline import RetrievalPipeline
     from src.retrieve.query_rewrite import rewrite
@@ -90,7 +107,6 @@ async def lifespan(app: FastAPI):
     )
     STATE["variants"] = {c.name: c for c in ABLATION_LADDER}
     STATE["started"] = time.time()
-    yield
 
 
 app = FastAPI(title="gst-rag", version="0.1.0", lifespan=lifespan)
@@ -99,6 +115,13 @@ app = FastAPI(title="gst-rag", version="0.1.0", lifespan=lifespan)
 @app.get("/health")
 async def health():
     pipeline = STATE.get("pipeline")
+    if STATE.get("error"):
+        return {
+            "status": "error",
+            "error": STATE["error"],
+            "n_chunks": 0,
+            "uptime_s": round(time.time() - STATE.get("started", time.time()), 1),
+        }
     return {
         "status": "ok" if pipeline else "loading",
         "n_chunks": len(pipeline.chunks) if pipeline else 0,
@@ -134,8 +157,21 @@ def empty_result_warning(as_of: date | None) -> str:
     return "no passages retrieved; the system should abstain"
 
 
+def skipped_stage_warning(config_name: str, skipped: list[str]) -> str:
+    return (
+        f"variant '{config_name}' asked for {', '.join(skipped)} but it isn't "
+        "loaded on this server; results come from the stages that did run"
+    )
+
+
+# Deliberately a plain `def`: retrieval and reranking are CPU-bound, and an
+# `async def` handler would run them on the event loop and stall every other
+# request (including /health) until the search finished. FastAPI runs plain
+# handlers in a worker thread.
 @app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+def query(request: QueryRequest):
+    if STATE.get("error"):
+        raise HTTPException(503, f"index failed to load: {STATE['error']}")
     pipeline = STATE.get("pipeline")
     if pipeline is None:
         raise HTTPException(503, "index still loading")
@@ -183,11 +219,15 @@ async def query(request: QueryRequest):
                 snippet=hit.chunk.text[:400],
                 section=metadata.get("section"),
                 published=metadata.get("published"),
+                stage_scores={k: round(v, 5) for k, v in hit.stage_scores.items()},
             )
         )
 
     if not result.hits:
         warnings.append(empty_result_warning(as_of_date))
+
+    if result.skipped_stages:
+        warnings.append(skipped_stage_warning(pipeline.config.name, result.skipped_stages))
 
     if as_of_date is not None:
         undated = sum(1 for c in citations if c.published is None)
@@ -208,6 +248,7 @@ async def query(request: QueryRequest):
             "stage_latency_ms": {k: round(v, 2) for k, v in result.latency_ms.items()},
             "total_ms": round((time.perf_counter() - started) * 1000, 2),
             "config": pipeline.config.name,
+            "skipped_stages": result.skipped_stages,
         },
         warnings=sorted(set(warnings)),
     )

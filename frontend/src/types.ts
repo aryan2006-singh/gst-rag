@@ -6,12 +6,14 @@ export interface Citation {
   snippet: string;
   section: string | null;
   published: string | null;
+  stage_scores?: Record<string, number>;
 }
 
 export interface QueryTrace {
   stage_latency_ms: Record<string, number>;
   total_ms: number;
   config: string;
+  skipped_stages?: string[];
 }
 
 export interface QueryResponse {

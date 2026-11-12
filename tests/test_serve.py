@@ -1,7 +1,6 @@
 """Unit tests for the pure helpers in src.serve.app.
 
-The FastAPI layer itself isn't integration-tested here -- spinning up the app
-loads a real index via its lifespan, which needs a built index on disk. These
+HTTP-level tests against a fixture pipeline live in test_serve_api.py. These
 tests cover the small pieces of logic that sit in the request handlers and are
 cheap to check directly, without starting the app.
 """

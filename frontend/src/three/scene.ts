@@ -11,6 +11,13 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
+export interface Pose {
+  x: number;
+  y: number;
+  z: number;
+  ry: number;
+}
+
 export interface SceneHandle {
   dispose: () => void;
 }
@@ -20,8 +27,8 @@ interface Options {
   reducedMotion: boolean;
   /** Elements whose visibility keeps the render loop running. */
   windows: () => HTMLElement[];
-  /** Where the object should sit: 0 = hero (right), 1 = pipeline (left). */
-  anchor: () => number;
+  /** Scroll-driven pose: object offset (x, y), camera distance (z) and turn (ry). */
+  pose: (mobile: boolean) => Pose;
 }
 
 const TAGS = ["§ 16(4)", "RULE 36", "NOTIF. 11/2017", "CIRC. 183", "SEC. 9", "GSTR-3B"];
@@ -72,7 +79,7 @@ function tagSprite(label: string): THREE.Sprite {
   return sprite;
 }
 
-export function createScene({ canvas, reducedMotion, windows, anchor }: Options): SceneHandle {
+export function createScene({ canvas, reducedMotion, windows, pose }: Options): SceneHandle {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -225,29 +232,25 @@ export function createScene({ canvas, reducedMotion, windows, anchor }: Options)
   const clock = new THREE.Clock();
   let raf = 0;
   let t = 0;
-  const cur = { x: 0, y: 0, ry: 0, s: 1 };
+  const cur = { ...pose(window.innerWidth < 768) };
 
   function frame() {
     raf = 0;
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!reducedMotion) t += dt;
 
-    const a = anchor(); // 0 hero .. 1 pipeline
-    const span = mobile ? 0.7 : 2.35;
-    const target = {
-      x: THREE.MathUtils.lerp(span, -span, a),
-      y: mobile ? THREE.MathUtils.lerp(-1.6, -1.0, a) : THREE.MathUtils.lerp(-0.15, -0.3, a),
-      ry: a * Math.PI * 1.15,
-      s: mobile ? 0.78 : 1,
-    };
-    const k = reducedMotion ? 1 : 1 - Math.pow(0.0015, dt);
+    const target = pose(mobile);
+    // Ease toward the scroll pose so a flick of the wheel glides, not jumps.
+    const k = reducedMotion ? 1 : 1 - Math.pow(0.004, dt);
     cur.x += (target.x - cur.x) * k;
     cur.y += (target.y - cur.y) * k;
+    cur.z += (target.z - cur.z) * k;
     cur.ry += (target.ry - cur.ry) * k;
-    cur.s += (target.s - cur.s) * k;
     rig.position.set(cur.x, cur.y, 0);
     rig.rotation.y = cur.ry;
-    rig.scale.setScalar(cur.s);
+    camera.position.z = cur.z;
+    // Dust thins out as the camera flies in, so close-ups stay clean.
+    (dust.material as THREE.PointsMaterial).opacity = THREE.MathUtils.clamp((cur.z - 2.5) / 6, 0.25, 0.75);
 
     const lk = reducedMotion ? 0 : 1 - Math.pow(0.02, dt);
     lean.rotation.y += (pointer.x * 0.35 - lean.rotation.y) * lk;

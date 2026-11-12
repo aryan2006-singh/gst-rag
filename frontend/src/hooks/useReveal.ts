@@ -31,7 +31,7 @@ export function useScrollVar() {
     let frame = 0;
     const update = () => {
       frame = 0;
-      const p = Math.min(window.scrollY / window.innerHeight, 1.5);
+      const p = Math.min(window.scrollY / Math.max(window.innerHeight, 1), 1.5);
       document.documentElement.style.setProperty("--scroll", p.toFixed(3));
     };
     const onScroll = () => {

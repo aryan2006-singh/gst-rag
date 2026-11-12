@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Nav from "./components/Nav";
 import Hero from "./components/Hero";
 import Principles from "./components/Principles";
+import Statement from "./components/Statement";
 import SearchSection from "./components/SearchSection";
 import Pipeline from "./components/Pipeline";
 import Stats from "./components/Stats";
@@ -66,6 +67,7 @@ export default function App() {
       <Nav />
       <main>
         <Hero />
+        <Statement />
         <Principles />
         <SearchSection
           variants={variants}

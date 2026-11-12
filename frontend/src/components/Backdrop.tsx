@@ -10,13 +10,38 @@ function webglAvailable() {
   }
 }
 
-/** 0 at the top of the page, 1 once the "How it works" section fills the view. */
-function anchor() {
-  const pipeline = document.getElementById("how");
-  if (!pipeline) return 0;
-  const end = pipeline.offsetTop - window.innerHeight * 0.15;
-  const x = Math.min(Math.max(window.scrollY / Math.max(end, 1), 0), 1);
-  return x * x * (3 - 2 * x);
+type Pose = { x: number; y: number; z: number; ry: number };
+
+/**
+ * Camera keyframes, pinned to sections: each pose applies when that section's
+ * top reaches the top of the viewport, and scroll blends between them. The
+ * camera starts far out with the object to the right, flies into it through
+ * the statement and the glass cards, then pulls back out for How it works.
+ */
+const KEYS: { id: string; desktop: Pose; mobile: Pose }[] = [
+  { id: "top", desktop: { x: 2.3, y: -0.15, z: 11, ry: 0 }, mobile: { x: 0.6, y: -1.5, z: 14, ry: 0 } },
+  { id: "statement", desktop: { x: 1.7, y: 0, z: 6.2, ry: 0.7 }, mobile: { x: 0, y: -0.4, z: 8.5, ry: 0.7 } },
+  { id: "why", desktop: { x: 0, y: 0.1, z: 2.9, ry: 1.5 }, mobile: { x: 0, y: 0, z: 3.4, ry: 1.5 } },
+  { id: "search", desktop: { x: 0, y: 0.1, z: 2.9, ry: 1.7 }, mobile: { x: 0, y: 0, z: 3.4, ry: 1.7 } },
+  { id: "how", desktop: { x: -2.4, y: -0.3, z: 10, ry: 3.0 }, mobile: { x: 0, y: -1.2, z: 13, ry: 3.0 } },
+];
+
+const smooth = (x: number) => x * x * (3 - 2 * x);
+
+function pose(mobile: boolean): Pose {
+  const pick = (k: (typeof KEYS)[number]) => (mobile ? k.mobile : k.desktop);
+  const tops = KEYS.map((k) => document.getElementById(k.id)?.offsetTop ?? 0);
+  const y = window.scrollY;
+  if (y <= tops[0]) return pick(KEYS[0]);
+  for (let i = 0; i < KEYS.length - 1; i++) {
+    if (y < tops[i + 1]) {
+      const t = smooth((y - tops[i]) / Math.max(tops[i + 1] - tops[i], 1));
+      const a = pick(KEYS[i]);
+      const b = pick(KEYS[i + 1]);
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t, ry: a.ry + (b.ry - a.ry) * t };
+    }
+  }
+  return pick(KEYS[KEYS.length - 1]);
 }
 
 /**
@@ -43,7 +68,7 @@ export default function Backdrop({ motion }: { motion: boolean }) {
         handle = createScene({
           canvas: canvasRef.current,
           reducedMotion,
-          anchor,
+          pose,
           windows: () => Array.from(document.querySelectorAll<HTMLElement>("[data-scene-window]")),
         });
         canvasRef.current.classList.add("opacity-100");

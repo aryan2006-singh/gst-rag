@@ -14,6 +14,7 @@ export interface QueryTrace {
   total_ms: number;
   config: string;
   skipped_stages?: string[];
+  cache?: "hit" | "miss";
 }
 
 export interface QueryResponse {

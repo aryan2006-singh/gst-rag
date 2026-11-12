@@ -35,6 +35,11 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 ENV EMBEDDER=hashing
 ENV RERANK=0
 ENV INDEX_DIR=data/index_cbic
+# Render puts one proxy in front of the app; its X-Forwarded-For entry is the
+# one to rate-limit on (see src/serve/limits.py:client_key).
+ENV TRUSTED_PROXY_HOPS=1
+ENV RATE_LIMIT_PER_MINUTE=60
+ENV QUERY_CACHE_SIZE=256
 
 EXPOSE 8000
 CMD ["sh", "-c", "uvicorn src.serve.app:app --host 0.0.0.0 --port ${PORT:-8000}"]

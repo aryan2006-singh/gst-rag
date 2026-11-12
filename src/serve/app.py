@@ -23,11 +23,12 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.retrieve.pipeline import ABLATION_LADDER, PipelineConfig
+from src.serve.limits import LRUCache, RateLimiter, client_key, retry_after_header
 
 STATE: dict = {}
 
@@ -76,7 +77,29 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer, got {raw!r}") from None
+
+
+def load_limits() -> None:
+    # The index is read-only for the life of the process, so a cached response
+    # never goes stale; the cache only has to be bounded.
+    STATE["cache"] = LRUCache(maxsize=env_int("QUERY_CACHE_SIZE", 256))
+    STATE["limiter"] = RateLimiter(per_minute=env_int("RATE_LIMIT_PER_MINUTE", 60))
+    # Number of reverse proxies in front of the app whose X-Forwarded-For
+    # entries can be trusted (1 on Render). 0 = use the TCP peer address.
+    STATE["trusted_proxy_hops"] = env_int("TRUSTED_PROXY_HOPS", 0)
+
+
 def load_state() -> None:
+    load_limits()
+
     from src.index.build import load_index
     from src.retrieve.pipeline import RetrievalPipeline
     from src.retrieve.query_rewrite import rewrite
@@ -126,6 +149,7 @@ async def health():
         "status": "ok" if pipeline else "loading",
         "n_chunks": len(pipeline.chunks) if pipeline else 0,
         "uptime_s": round(time.time() - STATE.get("started", time.time()), 1),
+        "cache": STATE["cache"].stats() if "cache" in STATE else None,
     }
 
 
@@ -169,7 +193,22 @@ def skipped_stage_warning(config_name: str, skipped: list[str]) -> str:
 # request (including /health) until the search finished. FastAPI runs plain
 # handlers in a worker thread.
 @app.post("/query", response_model=QueryResponse)
-def query(request: QueryRequest):
+def query(request: QueryRequest, http_request: Request):
+    limiter: RateLimiter | None = STATE.get("limiter")
+    if limiter is not None and limiter.enabled:
+        key = client_key(
+            http_request.client.host if http_request.client else None,
+            http_request.headers.get("x-forwarded-for"),
+            STATE.get("trusted_proxy_hops", 0),
+        )
+        wait = limiter.check(key)
+        if wait > 0:
+            raise HTTPException(
+                429,
+                "too many requests; slow down and retry shortly",
+                headers={"Retry-After": retry_after_header(wait)},
+            )
+
     if STATE.get("error"):
         raise HTTPException(503, f"index failed to load: {STATE['error']}")
     pipeline = STATE.get("pipeline")
@@ -192,6 +231,25 @@ def query(request: QueryRequest):
             )
 
     started = time.perf_counter()
+    cache: LRUCache | None = STATE.get("cache")
+    # Whitespace and case don't change retrieval (the tokenizer lowercases and
+    # the embedders see the same words), so they shouldn't miss the cache.
+    cache_key = (
+        " ".join(request.question.lower().split()),
+        request.top_k,
+        as_of_date,
+        pipeline.config.name,
+    )
+    if cache is not None:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            trace = {
+                **cached.trace,
+                "cache": "hit",
+                "total_ms": round((time.perf_counter() - started) * 1000, 2),
+            }
+            return cached.model_copy(update={"question": request.question, "trace": trace})
+
     result = pipeline.search(request.question, top_k=request.top_k, as_of=as_of_date)
     graph = STATE["graph"]
 
@@ -236,7 +294,7 @@ def query(request: QueryRequest):
                 f"{undated} result(s) have no publication date and were not filtered by as-of"
             )
 
-    return QueryResponse(
+    response = QueryResponse(
         question=request.question,
         rewritten_query=result.rewritten_query,
         # Generation is intentionally not wired by default: an ungrounded
@@ -249,9 +307,13 @@ def query(request: QueryRequest):
             "total_ms": round((time.perf_counter() - started) * 1000, 2),
             "config": pipeline.config.name,
             "skipped_stages": result.skipped_stages,
+            "cache": "miss",
         },
         warnings=sorted(set(warnings)),
     )
+    if cache is not None:
+        cache.put(cache_key, response)
+    return response
 
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

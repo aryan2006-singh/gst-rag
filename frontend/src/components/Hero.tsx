@@ -1,6 +1,6 @@
 import { ArrowDot } from "./Icons";
 
-export default function Hero({ motion, onToggleMotion }: { motion: boolean; onToggleMotion: () => void }) {
+export default function Hero() {
   return (
     <section id="top" data-scene-window className="relative isolate overflow-hidden">
       <div className="container-x relative grid min-h-[100svh] grid-rows-[1fr_auto] pb-10 pt-28 lg:pt-32">
@@ -20,19 +20,6 @@ export default function Hero({ motion, onToggleMotion }: { motion: boolean; onTo
               How it works
             </a>
           </div>
-          {!motion && (
-            <button
-              type="button"
-              onClick={onToggleMotion}
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-black/30 px-4 py-2 text-sm text-white
-                         backdrop-blur-md transition hover:bg-black/45"
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
-                <path d="M8 5.5v13l10-6.5-10-6.5Z" />
-              </svg>
-              Motion is off on this device. Turn on 3D motion
-            </button>
-          )}
         </div>
 
         <p className="relative mt-16 max-w-md justify-self-end rounded-lg bg-black/25 p-4 text-[17px]

@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { ArrowDot } from "./Icons";
 
 interface SearchBarProps {
   onSearch: (question: string) => void;
@@ -14,36 +15,37 @@ const EXAMPLE_QUERIES = [
 
 export default function SearchBar({ onSearch, loading }: SearchBarProps) {
   const [question, setQuestion] = useState("");
+  const ready = question.trim().length >= 3;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (question.trim().length >= 3) {
-      onSearch(question.trim());
-    }
+    if (ready) onSearch(question.trim());
   }
 
   return (
     <div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-3 rounded-xl bg-card p-2 sm:flex-row sm:items-center"
+      >
+        <label htmlFor="q" className="sr-only">
+          Your GST question
+        </label>
         <input
+          id="q"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Can I claim ITC on hotel stay?"
-          className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5
-                     text-sm text-slate-900 placeholder:text-slate-400
-                     focus:border-slate-500 focus:outline-none
-                     dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          placeholder="Ask about ITC, returns, registration, rates…"
+          className="min-w-0 flex-1 bg-transparent px-4 py-4 text-[clamp(18px,2vw,22px)] tracking-tight
+                     placeholder:text-muted/70 focus:outline-none"
         />
-        <button
-          type="submit"
-          disabled={loading || question.trim().length < 3}
-          className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white
-                     disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900"
-        >
+        <button type="submit" disabled={loading || !ready} className="btn-dark justify-center py-4">
           {loading ? "Searching…" : "Search"}
+          {!loading && <ArrowDot invert />}
         </button>
       </form>
-      <div className="mt-3 flex flex-wrap gap-2">
+
+      <div className="mt-4 flex flex-wrap gap-2">
         {EXAMPLE_QUERIES.map((example) => (
           <button
             key={example}
@@ -52,8 +54,8 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
               setQuestion(example);
               onSearch(example);
             }}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600
-                       hover:border-slate-400 dark:border-slate-700 dark:text-slate-400"
+            className="rounded-full border border-line px-4 py-2 text-sm text-muted transition
+                       hover:border-ink hover:text-ink"
           >
             {example}
           </button>

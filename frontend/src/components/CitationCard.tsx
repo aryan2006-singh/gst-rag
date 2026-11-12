@@ -1,35 +1,59 @@
 import type { Citation } from "../types";
 
-const STATUS_STYLES: Record<Citation["status"], string> = {
-  in_force:
-    "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
-  amended:
-    "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
-  superseded:
-    "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300",
-  unknown:
-    "border-slate-400 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-400",
+const STATUS: Record<Citation["status"], { label: string; dot: string }> = {
+  in_force: { label: "In force", dot: "bg-emerald-500" },
+  amended: { label: "Amended", dot: "bg-amber" },
+  superseded: { label: "Superseded", dot: "bg-red-500" },
+  unknown: { label: "Status unknown", dot: "bg-neutral-400" },
 };
 
-export default function CitationCard({ citation }: { citation: Citation }) {
+const ACRONYMS = new Set(["cgst", "sgst", "igst", "utgst", "gst", "itc", "rcm", "faq", "faqs", "cbic", "gstr", "e"]);
+
+function prettyDoc(docId: string) {
+  return docId
+    .replace(/^(rules|faq|circular|notification|instruction)-/, "")
+    .split("-")
+    .map((word) => (ACRONYMS.has(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
+function tidy(snippet: string) {
+  return snippet.replace(/#{2,}\s*/g, "").replace(/\n\s*\n+/g, "\n").trim();
+}
+
+export default function CitationCard({ citation, rank }: { citation: Citation; rank: number }) {
+  const status = STATUS[citation.status] ?? STATUS.unknown;
+  const stages = Object.entries(citation.stage_scores ?? {});
+
   return (
-    <div className="rounded-lg border-l-4 border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[citation.status]}`}>
-          {citation.status}
+    <article className="reveal group rounded-lg bg-card p-6 transition hover:bg-line/60 lg:p-8">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="font-mono text-xs text-muted">{String(rank).padStart(2, "0")}</span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-paper px-3 py-1 text-xs font-medium">
+          <span className={"h-1.5 w-1.5 rounded-full " + status.dot} />
+          {status.label}
         </span>
-        <span className="font-semibold text-slate-800 dark:text-slate-100">{citation.doc_id}</span>
-        {citation.section && (
-          <span className="text-slate-500 dark:text-slate-400">section {citation.section}</span>
-        )}
-        <span className="ml-auto font-mono text-xs text-slate-400">
+        <span className="font-mono text-xs text-muted">
           score {citation.score.toFixed(3)}
           {citation.published ? ` · ${citation.published}` : ""}
         </span>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-        {citation.snippet}
-      </p>
-    </div>
+
+      <h3 className="mt-5 text-[22px] font-medium leading-tight tracking-tight">
+        {prettyDoc(citation.doc_id)}
+        {citation.section && <span className="text-muted"> · section {citation.section}</span>}
+      </h3>
+      <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed text-muted">{tidy(citation.snippet)}</p>
+
+      {stages.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2 font-mono text-[11px] text-muted">
+          {stages.map(([stage, score]) => (
+            <span key={stage} className="rounded border border-line px-2 py-0.5">
+              {stage} {score.toFixed(3)}
+            </span>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }

@@ -11,8 +11,18 @@ export default function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="container-x flex items-center justify-between gap-4 py-5">
-        {/* Spacer keeps the section pill centred. */}
-        <span aria-hidden className="hidden w-[178px] md:block" />
+        {/* The section sign from the 3D sheet doubles as the logo. The wrapper
+            matches the right-hand button's width so the pill stays centred. */}
+        <span className="flex md:w-[178px]">
+          <a
+            href="#top"
+            aria-label="GST retrieval, back to top"
+            className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-white/[0.08]
+                       text-[28px] font-medium leading-none text-amber backdrop-blur-md transition hover:bg-white/15"
+          >
+            <span className="-mt-0.5">§</span>
+          </a>
+        </span>
 
         <nav
           aria-label="Sections"
@@ -30,7 +40,7 @@ export default function Nav() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="flex items-center gap-2">
           <a href="#search" className="btn-light hidden sm:inline-flex">
             Ask a question <ArrowDot />
           </a>

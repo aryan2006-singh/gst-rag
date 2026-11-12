@@ -12,68 +12,7 @@ import { fetchHealth, fetchVariants, runQuery } from "./api";
 import { useReveal, useScrollVar } from "./hooks/useReveal";
 import type { QueryResponse, Variant } from "./types";
 
-function readTheme(): boolean {
-  try {
-    const stored = localStorage.getItem("gst-rag-theme");
-    if (stored) return stored === "dark";
-  } catch {
-    // storage unavailable; fall through to the OS preference
-  }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function useDarkMode(): [boolean, () => void] {
-  const [dark, setDark] = useState(readTheme);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    try {
-      localStorage.setItem("gst-rag-theme", dark ? "dark" : "light");
-    } catch {
-      // ignore
-    }
-  }, [dark]);
-
-  return [dark, () => setDark((value) => !value)];
-}
-
-function readMotion(): boolean {
-  try {
-    const stored = localStorage.getItem("gst-rag-motion");
-    if (stored) return stored === "on";
-  } catch {
-    // storage unavailable
-  }
-  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/** Motion follows the OS setting until the visitor flips the switch in the nav. */
-function useMotion(): [boolean, () => void] {
-  const [motion, setMotion] = useState(() => {
-    const value = readMotion();
-    document.documentElement.classList.toggle("reduce-motion", !value);
-    return value;
-  });
-  useEffect(() => {
-    document.documentElement.classList.toggle("reduce-motion", !motion);
-  }, [motion]);
-  return [
-    motion,
-    () =>
-      setMotion((value) => {
-        try {
-          localStorage.setItem("gst-rag-motion", value ? "off" : "on");
-        } catch {
-          // ignore
-        }
-        return !value;
-      }),
-  ];
-}
-
 export default function App() {
-  const [dark, toggleDark] = useDarkMode();
-  const [motion, toggleMotion] = useMotion();
   const [variants, setVariants] = useState<Variant[]>([]);
   const [chunks, setChunks] = useState<number | null>(null);
   const [selectedVariant, setSelectedVariant] = useState("");
@@ -83,7 +22,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useScrollVar();
-  useTilt(motion);
+  useTilt(true);
   useReveal([result]);
 
   useEffect(() => {
@@ -123,10 +62,10 @@ export default function App() {
       <a href="#search" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-black">
         Skip to search
       </a>
-      <Backdrop key={motion ? "m" : "s"} motion={motion} />
-      <Nav dark={dark} onToggleDark={toggleDark} motion={motion} onToggleMotion={toggleMotion} />
+      <Backdrop motion />
+      <Nav />
       <main>
-        <Hero motion={motion} onToggleMotion={toggleMotion} />
+        <Hero />
         <Principles />
         <SearchSection
           variants={variants}

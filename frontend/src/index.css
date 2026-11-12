@@ -123,9 +123,33 @@ body {
 .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s ease; }
 .reveal.in { opacity: 1; transform: none; }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .ring-a, .ring-b, .ring-c, .float { animation: none; }
-  .orbit-spin { transition: none; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+/* Motion off: set from the OS preference, overridable with the nav switch. */
+.reduce-motion { scroll-behavior: auto; }
+.reduce-motion .ring-a, .reduce-motion .ring-b, .reduce-motion .ring-c, .reduce-motion .float { animation: none; }
+.reduce-motion .orbit-spin { transition: none; }
+.reduce-motion .reveal { opacity: 1; transform: none; transition: none; }
+
+/* Headline lines swing up out of the page on load. */
+.rise3d {
+  opacity: 0;
+  transform: perspective(900px) rotateX(-55deg) translateY(40px);
+  transform-origin: 50% 100%;
+  animation: rise3d 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
+@keyframes rise3d {
+  to { opacity: 1; transform: perspective(900px) rotateX(0) translateY(0); }
+}
+
+/* Pointer tilt on cards (see hooks/useTilt.ts). */
+[data-tilt] {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+[data-tilt].reveal.in,
+[data-tilt]:not(.reveal) {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(var(--tz, 0px));
+  transition: transform 0.25s ease-out, opacity 0.8s ease, background-color 0.2s;
+}
+
+.reduce-motion .rise3d { opacity: 1; transform: none; animation: none; }
+.reduce-motion [data-tilt].reveal.in, .reduce-motion [data-tilt]:not(.reveal) { transform: none; }

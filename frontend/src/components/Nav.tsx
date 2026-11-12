@@ -7,7 +7,17 @@ const LINKS = [
   { href: "#about", label: "About" },
 ];
 
-export default function Nav({ dark, onToggleDark }: { dark: boolean; onToggleDark: () => void }) {
+interface NavProps {
+  dark: boolean;
+  onToggleDark: () => void;
+  motion: boolean;
+  onToggleMotion: () => void;
+}
+
+const iconBtn =
+  "grid h-11 w-11 place-items-center rounded-md border border-black/10 bg-white/80 text-black backdrop-blur transition hover:bg-white";
+
+export default function Nav({ dark, onToggleDark, motion, onToggleMotion }: NavProps) {
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="container-x flex items-center justify-between gap-4 py-5">
@@ -34,10 +44,29 @@ export default function Nav({ dark, onToggleDark }: { dark: boolean; onToggleDar
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={onToggleMotion}
+            aria-pressed={motion}
+            aria-label={motion ? "Turn motion off" : "Turn motion on"}
+            title={motion ? "Motion on" : "Motion off"}
+            className={iconBtn}
+          >
+            {motion ? (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(-30 12 12)" />
+                <ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(30 12 12)" />
+                <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
             onClick={onToggleDark}
             aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-            className="grid h-11 w-11 place-items-center rounded-md border border-black/10 bg-white/80 text-black backdrop-blur
-                       transition hover:bg-white"
+            className={iconBtn}
           >
             {dark ? (
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">

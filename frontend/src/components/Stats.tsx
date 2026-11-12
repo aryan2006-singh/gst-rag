@@ -14,7 +14,8 @@ export default function Stats({ chunks, variants }: StatsProps) {
   ];
 
   return (
-    <section id="about" className="container-x scroll-mt-24 py-24 lg:py-32">
+    <section id="about" className="relative scroll-mt-24 bg-paper">
+      <div className="container-x py-24 lg:py-32">
       <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
         <div>
           <p className="eyebrow reveal text-muted">Key stats</p>
@@ -29,12 +30,13 @@ export default function Stats({ chunks, variants }: StatsProps) {
 
         <dl className="grid grid-cols-2 gap-4">
           {items.map((item) => (
-            <div key={item.label} className="reveal flex min-h-[180px] flex-col justify-between rounded-lg bg-card p-6 lg:p-8">
+            <div key={item.label} data-tilt className="reveal flex min-h-[180px] flex-col justify-between rounded-lg bg-card p-6 lg:p-8">
               <dt className="text-sm text-muted">{item.label}</dt>
               <dd className="text-[clamp(40px,5vw,72px)] font-medium leading-none tracking-tightest">{item.value}</dd>
             </div>
           ))}
         </dl>
+      </div>
       </div>
     </section>
   );

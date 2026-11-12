@@ -21,7 +21,7 @@ const ITEMS = [
 
 export default function Principles() {
   return (
-    <section id="why" className="container-x scroll-mt-24 py-24 lg:py-32">
+    <section id="why" className="relative scroll-mt-24 bg-paper"><div className="container-x scroll-mt-24 py-24 lg:py-32">
       <p className="eyebrow reveal text-muted">Why it's different</p>
       <h2 className="reveal mt-6 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest">
         Built for answers you can defend.
@@ -31,6 +31,7 @@ export default function Principles() {
         {ITEMS.map(({ icon: Icon, title, body, featured }) => (
           <article
             key={title}
+            data-tilt
             className={
               "reveal flex min-h-[340px] flex-col justify-between rounded-lg p-8 lg:p-10 " +
               (featured ? "bg-black text-white dark:bg-white dark:text-black" : "bg-card")
@@ -43,6 +44,7 @@ export default function Principles() {
             </div>
           </article>
         ))}
+      </div>
       </div>
     </section>
   );

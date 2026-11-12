@@ -1,4 +1,3 @@
-import GlassOrbit from "./GlassOrbit";
 import { Asterisk } from "./Icons";
 
 const STEPS = [
@@ -10,40 +9,34 @@ const STEPS = [
 
 export default function Pipeline() {
   return (
-    <section
-      id="how"
-      className="grain relative isolate scroll-mt-0 overflow-hidden
-                 bg-[radial-gradient(110%_80%_at_28%_85%,#dfe4e7_0%,#aeb7bd_45%,#76818a_100%)]
-                 dark:bg-[radial-gradient(110%_80%_at_28%_85%,#3a4146_0%,#1b1f22_55%,#080909_100%)]"
-    >
-      <div className="pointer-events-none absolute -left-[30%] bottom-[-20%] w-[90vw] max-w-[820px] opacity-70 lg:-left-[10%] lg:w-[50vw]">
-        <GlassOrbit />
-      </div>
+    <section id="how" data-scene-window className="relative isolate overflow-hidden">
 
-      <div className="container-x relative grid gap-12 py-24 lg:grid-cols-[1fr_1.35fr] lg:py-36">
-        <div>
+      <div className="container-x relative grid py-24 lg:min-h-[100vh] lg:grid-cols-[0.85fr_1.15fr] lg:py-36">
+        <div className="lg:col-start-2">
           <p className="eyebrow text-white/90">How it works</p>
-          <h2 className="mt-6 max-w-md text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest text-white">
+          <h2 className="mt-6 max-w-xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest text-white
+                         [text-shadow:0_2px_30px_rgba(0,0,0,0.15)]">
             Four steps from question to source.
           </h2>
-        </div>
 
-        <ol className="space-y-4">
-          {STEPS.map((step, i) => (
-            <li
-              key={step.title}
-              className="reveal grid gap-6 rounded-lg bg-black/45 p-7 text-white backdrop-blur-xl sm:grid-cols-[1fr_1.1fr] lg:p-9"
-            >
-              <div className="flex flex-col justify-between gap-10">
-                <span className="flex items-center gap-3 font-mono text-xs text-white/70">
-                  <Asterisk className="h-6 w-6 text-white" /> 0{i + 1}
-                </span>
-                <h3 className="text-[28px] font-medium leading-tight tracking-tight">{step.title}</h3>
-              </div>
-              <p className="self-end text-[16px] leading-snug text-white/85">{step.body}</p>
-            </li>
-          ))}
-        </ol>
+          <ol className="mt-12 space-y-4 [perspective:1200px]">
+            {STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                data-tilt
+                className="reveal grid gap-6 rounded-lg bg-black/45 p-7 text-white backdrop-blur-xl sm:grid-cols-[1fr_1.1fr] lg:p-9"
+              >
+                <div className="flex flex-col justify-between gap-10">
+                  <span className="flex items-center gap-3 font-mono text-xs text-white/70">
+                    <Asterisk className="h-6 w-6 text-white" /> 0{i + 1}
+                  </span>
+                  <h3 className="text-[28px] font-medium leading-tight tracking-tight">{step.title}</h3>
+                </div>
+                <p className="self-end text-[16px] leading-snug text-white/85">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </section>
   );

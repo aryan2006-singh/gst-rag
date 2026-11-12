@@ -18,7 +18,7 @@ export default function Nav() {
             href="#top"
             aria-label="GST retrieval, back to top"
             className="grid h-11 w-11 place-items-center rounded-md border border-white/15 bg-white/[0.08]
-                       text-[28px] font-medium leading-none text-amber backdrop-blur-md transition hover:bg-white/15"
+                       text-[28px] font-medium leading-none text-white backdrop-blur-md transition hover:bg-white/15"
           >
             <span className="-mt-0.5">§</span>
           </a>

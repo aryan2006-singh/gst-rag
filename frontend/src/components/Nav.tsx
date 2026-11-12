@@ -12,7 +12,7 @@ export default function Nav() {
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="container-x flex items-center justify-between gap-4 py-5">
         {/* Spacer keeps the section pill centred. */}
-        <span aria-hidden className="hidden w-[150px] md:block" />
+        <span aria-hidden className="hidden w-[178px] md:block" />
 
         <nav
           aria-label="Sections"

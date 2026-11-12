@@ -5,10 +5,10 @@ export default function Footer() {
     <footer className="bg-black text-white">
       <div className="container-x py-20">
         <div className="flex flex-col justify-between gap-10 md:flex-row md:items-end">
-          <h2 className="max-w-xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest">
+          <h2 className="reveal max-w-xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest">
             Have a GST question?
           </h2>
-          <a href="#search" className="btn-light self-start md:self-auto">
+          <a href="#search" style={{ ["--d" as string]: "150ms" }} className="reveal btn-light self-start md:self-auto">
             Ask it now <ArrowDot />
           </a>
         </div>

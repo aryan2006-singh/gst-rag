@@ -26,7 +26,9 @@ export default function CitationCard({ citation, rank }: { citation: Citation; r
   const stages = Object.entries(citation.stage_scores ?? {});
 
   return (
-    <article className="reveal group rounded-lg bg-card p-6 transition hover:bg-line/60 lg:p-8">
+    <article
+      style={{ ["--d" as string]: `${Math.min(rank - 1, 5) * 110}ms` }}
+      className="reveal group rounded-lg bg-card p-6 transition hover:bg-line/60 lg:p-8">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="font-mono text-xs text-muted">{String(rank).padStart(2, "0")}</span>
         <span className="inline-flex items-center gap-2 rounded-full bg-paper px-3 py-1 text-xs font-medium">

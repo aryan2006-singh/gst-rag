@@ -25,14 +25,14 @@ export default function SearchSection(props: Props) {
       <div className="container-x">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="eyebrow text-muted">Search</p>
-            <h2 className="mt-6 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest">
+            <p className="eyebrow reveal text-muted">Search</p>
+            <h2 style={{ ["--d" as string]: "80ms" }} className="reveal mt-6 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-medium leading-[1.04] tracking-tightest">
               Ask in plain words. Get the source.
             </h2>
           </div>
         </div>
 
-        <div className="mt-12">
+        <div style={{ ["--d" as string]: "160ms" }} className="reveal mt-12">
           <SearchBar onSearch={props.onSearch} loading={loading} />
           <ControlsBar
             variants={props.variants}

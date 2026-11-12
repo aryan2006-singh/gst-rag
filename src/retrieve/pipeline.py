@@ -62,6 +62,10 @@ class RetrievalResult:
     rewritten_query: str
     hits: list[RetrievedChunk]
     latency_ms: dict[str, float]
+    # Stages the config asked for that could not run (e.g. rerank requested
+    # but no reranker loaded). Reported so a trace never claims work it
+    # didn't do.
+    skipped_stages: list[str] = field(default_factory=list)
 
     @property
     def ranked_ids(self) -> list[str]:
@@ -125,12 +129,23 @@ class RetrievalPipeline:
         config = self.config
         k = top_k or config.top_k
         latency: dict[str, float] = {}
+        skipped: list[str] = []
+        # Per-candidate score at each stage, so "why did it retrieve that?"
+        # has an answer in the response.
+        stage_scores: dict[str, dict[str, float]] = {}
+
+        def record(stage: str, ranking: Sequence[tuple[str, float]]) -> None:
+            for doc_id, score in ranking:
+                stage_scores.setdefault(doc_id, {})[stage] = float(score)
 
         effective_query = query
-        if config.query_rewrite and self.query_rewriter is not None:
-            start = time.perf_counter()
-            effective_query = self.query_rewriter(query)
-            latency["rewrite"] = (time.perf_counter() - start) * 1000
+        if config.query_rewrite:
+            if self.query_rewriter is None:
+                skipped.append("rewrite")
+            else:
+                start = time.perf_counter()
+                effective_query = self.query_rewriter(query)
+                latency["rewrite"] = (time.perf_counter() - start) * 1000
 
         rankings: dict[str, list[tuple[str, float]]] = {}
         if config.use_bm25:
@@ -157,6 +172,10 @@ class RetrievalPipeline:
                 weights={"bm25": config.bm25_weight, "dense": config.dense_weight},
             )
         latency["fusion"] = (time.perf_counter() - start) * 1000
+        for name, ranking in rankings.items():
+            record(name, ranking)
+        if len(rankings) > 1:
+            record("fusion", fused)
 
         if config.recency_boost:
             from src.retrieve.recency import apply_recency_boost
@@ -164,6 +183,7 @@ class RetrievalPipeline:
             start = time.perf_counter()
             fused = apply_recency_boost(fused, self.by_id, weight=config.recency_boost)
             latency["recency"] = (time.perf_counter() - start) * 1000
+            record("recency", fused)
 
         if as_of is not None:
             from src.retrieve.recency import filter_as_of
@@ -172,7 +192,9 @@ class RetrievalPipeline:
             fused = filter_as_of(fused, self.by_id, as_of)
             latency["as_of_filter"] = (time.perf_counter() - start) * 1000
 
-        if config.rerank and self.reranker is not None:
+        if config.rerank and self.reranker is None:
+            skipped.append("rerank")
+        elif config.rerank:
             start = time.perf_counter()
             head = fused[: config.rerank_depth]
             tail = fused[config.rerank_depth :]
@@ -183,9 +205,15 @@ class RetrievalPipeline:
             # is never *worse* than the fusion baseline.
             fused = reranked + tail
             latency["rerank"] = (time.perf_counter() - start) * 1000
+            record("rerank", reranked)
 
         hits = [
-            RetrievedChunk(chunk_id=doc_id, score=score, chunk=self.by_id[doc_id])
+            RetrievedChunk(
+                chunk_id=doc_id,
+                score=score,
+                chunk=self.by_id[doc_id],
+                stage_scores=stage_scores.get(doc_id, {}),
+            )
             for doc_id, score in fused[:k]
         ]
         return RetrievalResult(
@@ -193,6 +221,7 @@ class RetrievalPipeline:
             rewritten_query=effective_query,
             hits=hits,
             latency_ms=latency,
+            skipped_stages=skipped,
         )
 
     def with_config(self, config: PipelineConfig) -> RetrievalPipeline:

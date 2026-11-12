@@ -3,7 +3,7 @@ EMBEDDER  ?= sentence-transformers
 INDEX     ?= data/index
 GOLD      ?= data/gold/gold_set.jsonl
 
-.PHONY: install test demo scrape extract build eval eval-dev validate-judge frontend serve clean
+.PHONY: install test demo scrape fetch-starter ingest-local starter-index extract build eval eval-dev validate-judge frontend serve clean
 
 install:
 	pip install -r requirements.txt
@@ -23,6 +23,21 @@ check-robots:
 
 scrape:
 	python -m src.ingest.cbic_scraper --out data/raw/manifest.jsonl --delay 2.0
+
+## Hand-downloaded PDFs (or the starter set below) -> manifest.jsonl.
+## Optional data/raw/pdfs/sources.jsonl sidecar gives titles/urls/dates.
+PDF_DIR ?= data/raw/pdfs
+ingest-local:
+	python -m src.ingest.local_pdfs --pdf-dir $(PDF_DIR) --out data/raw/manifest.jsonl
+
+## Curated CBIC GST starter set (data/sources/cbic_gst_starter.jsonl) -> data/raw/pdfs.
+fetch-starter:
+	python scripts/fetch_cbic_starter.py --out-dir $(PDF_DIR)
+
+## Index the committed, pre-extracted starter corpus. No PDFs or downloads needed.
+starter-index:
+	python -m src.index.build --docs data/corpus/cbic_gst_starter.documents.jsonl.gz \
+		--strategy $(STRATEGY) --embedder $(EMBEDDER) --out $(INDEX)
 
 extract:
 	python -m src.ingest.run_extract --manifest data/raw/manifest.jsonl \

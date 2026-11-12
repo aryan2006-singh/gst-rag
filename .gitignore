@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 data/raw/cache/
+data/raw/pdfs/
+data/raw/manifest.jsonl
 data/index*/
 data/cache/
 data/processed/

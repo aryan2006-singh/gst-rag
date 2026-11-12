@@ -28,8 +28,9 @@ export default function ControlsBar({
                      dark:border-slate-700 dark:bg-slate-900"
         >
           {variants.map((variant) => (
-            <option key={variant.name} value={variant.name}>
+            <option key={variant.name} value={variant.name} disabled={variant.available === false}>
               {variant.name}
+              {variant.available === false ? " (not loaded)" : ""}
             </option>
           ))}
         </select>

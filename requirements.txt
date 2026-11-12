@@ -19,8 +19,10 @@ pdfplumber>=0.11
 
 # Tests
 pytest>=8.0
+httpx>=0.27          # FastAPI TestClient
 
 # Optional
+# fastembed>=0.4         # EMBEDDER=fastembed: bge/e5 via ONNX Runtime, no torch
 # ragas>=0.2            # if you want the standard metric implementations too
 # qdrant-client>=1.9    # if the flat numpy index stops being enough (>~500k chunks)
 # rank-bm25>=0.2        # not needed; src/index/bm25.py is self-contained

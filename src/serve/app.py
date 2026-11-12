@@ -23,11 +23,12 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.retrieve.pipeline import ABLATION_LADDER, PipelineConfig
+from src.serve.limits import LRUCache, RateLimiter, client_key, retry_after_header
 
 STATE: dict = {}
 
@@ -47,6 +48,10 @@ class Citation(BaseModel):
     snippet: str
     section: str | None = None
     published: str | None = None
+    # Score this chunk got at each stage it appeared in (bm25, dense, fusion,
+    # recency, rerank). A stage is missing when the chunk wasn't in that
+    # stage's candidate list.
+    stage_scores: dict[str, float] = Field(default_factory=dict)
 
 
 class QueryResponse(BaseModel):
@@ -60,6 +65,41 @@ class QueryResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # A failed index load should be visible on /health, not hidden behind a
+    # status that says "loading" forever or a container that crash-loops
+    # without telling anyone why.
+    try:
+        load_state()
+    except Exception as exc:  # noqa: BLE001 - surfaced via /health and /query
+        STATE["error"] = f"{type(exc).__name__}: {exc}"
+        STATE["started"] = time.time()
+        print(f"index load failed: {STATE['error']}")
+    yield
+
+
+def env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer, got {raw!r}") from None
+
+
+def load_limits() -> None:
+    # The index is read-only for the life of the process, so a cached response
+    # never goes stale; the cache only has to be bounded.
+    STATE["cache"] = LRUCache(maxsize=env_int("QUERY_CACHE_SIZE", 256))
+    STATE["limiter"] = RateLimiter(per_minute=env_int("RATE_LIMIT_PER_MINUTE", 60))
+    # Number of reverse proxies in front of the app whose X-Forwarded-For
+    # entries can be trusted (1 on Render). 0 = use the TCP peer address.
+    STATE["trusted_proxy_hops"] = env_int("TRUSTED_PROXY_HOPS", 0)
+
+
+def load_state() -> None:
+    load_limits()
+
     from src.index.build import load_index
     from src.retrieve.pipeline import RetrievalPipeline
     from src.retrieve.query_rewrite import rewrite
@@ -76,11 +116,16 @@ async def lifespan(app: FastAPI):
 
         reranker = CrossEncoderReranker()
 
-    best = next(c for c in ABLATION_LADDER if c.name == "Hybrid + reranker")
+    variants = {c.name: c for c in ABLATION_LADDER}
+    default_name = os.environ.get("DEFAULT_VARIANT") or (
+        "Hybrid + reranker" if reranker else "Hybrid (RRF)"
+    )
+    if default_name not in variants:
+        raise ValueError(f"DEFAULT_VARIANT {default_name!r} is not one of {sorted(variants)}")
     STATE["pipeline"] = RetrievalPipeline(
         chunks=chunks,
         embedder=embedder,
-        config=best if reranker else ABLATION_LADDER[2],
+        config=variants[default_name],
         reranker=reranker,
         query_rewriter=rewrite,
         embeddings=embeddings,
@@ -88,9 +133,8 @@ async def lifespan(app: FastAPI):
     STATE["graph"] = build_supersession_graph(
         [(c.doc_id, c.text) for c in chunks]
     )
-    STATE["variants"] = {c.name: c for c in ABLATION_LADDER}
+    STATE["variants"] = variants
     STATE["started"] = time.time()
-    yield
 
 
 app = FastAPI(title="gst-rag", version="0.1.0", lifespan=lifespan)
@@ -99,14 +143,22 @@ app = FastAPI(title="gst-rag", version="0.1.0", lifespan=lifespan)
 @app.get("/health")
 async def health():
     pipeline = STATE.get("pipeline")
+    if STATE.get("error"):
+        return {
+            "status": "error",
+            "error": STATE["error"],
+            "n_chunks": 0,
+            "uptime_s": round(time.time() - STATE.get("started", time.time()), 1),
+        }
     return {
         "status": "ok" if pipeline else "loading",
         "n_chunks": len(pipeline.chunks) if pipeline else 0,
         "uptime_s": round(time.time() - STATE.get("started", time.time()), 1),
+        "cache": STATE["cache"].stats() if "cache" in STATE else None,
     }
 
 
-def variant_summary(config: PipelineConfig) -> dict:
+def variant_summary(config: PipelineConfig, default: bool = False, available: bool = True) -> dict:
     return {
         "name": config.name,
         "use_bm25": config.use_bm25,
@@ -114,12 +166,29 @@ def variant_summary(config: PipelineConfig) -> dict:
         "rerank": config.rerank,
         "query_rewrite": config.query_rewrite,
         "recency_boost": config.recency_boost,
+        # The variant /query uses when the request names none. The UI selects
+        # it on load, so the server, not the UI, decides what users see first.
+        "default": default,
+        # False when the variant needs a stage this server didn't load (a
+        # reranker, usually); querying it still works but skips that stage.
+        "available": available,
     }
 
 
 @app.get("/variants")
 async def variants():
-    return [variant_summary(c) for c in ABLATION_LADDER]
+    pipeline = STATE.get("pipeline")
+    if pipeline is None:
+        return [variant_summary(c) for c in ABLATION_LADDER]
+    return [
+        variant_summary(
+            c,
+            default=c.name == pipeline.config.name,
+            available=not (c.rerank and pipeline.reranker is None)
+            and not (c.query_rewrite and pipeline.query_rewriter is None),
+        )
+        for c in ABLATION_LADDER
+    ]
 
 
 # NOTE: the exact wording of the warning strings below (here and in the
@@ -134,8 +203,36 @@ def empty_result_warning(as_of: date | None) -> str:
     return "no passages retrieved; the system should abstain"
 
 
+def skipped_stage_warning(config_name: str, skipped: list[str]) -> str:
+    return (
+        f"variant '{config_name}' asked for {', '.join(skipped)} but it isn't "
+        "loaded on this server; results come from the stages that did run"
+    )
+
+
+# Deliberately a plain `def`: retrieval and reranking are CPU-bound, and an
+# `async def` handler would run them on the event loop and stall every other
+# request (including /health) until the search finished. FastAPI runs plain
+# handlers in a worker thread.
 @app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+def query(request: QueryRequest, http_request: Request):
+    limiter: RateLimiter | None = STATE.get("limiter")
+    if limiter is not None and limiter.enabled:
+        key = client_key(
+            http_request.client.host if http_request.client else None,
+            http_request.headers.get("x-forwarded-for"),
+            STATE.get("trusted_proxy_hops", 0),
+        )
+        wait = limiter.check(key)
+        if wait > 0:
+            raise HTTPException(
+                429,
+                "too many requests; slow down and retry shortly",
+                headers={"Retry-After": retry_after_header(wait)},
+            )
+
+    if STATE.get("error"):
+        raise HTTPException(503, f"index failed to load: {STATE['error']}")
     pipeline = STATE.get("pipeline")
     if pipeline is None:
         raise HTTPException(503, "index still loading")
@@ -156,6 +253,25 @@ async def query(request: QueryRequest):
             )
 
     started = time.perf_counter()
+    cache: LRUCache | None = STATE.get("cache")
+    # Whitespace and case don't change retrieval (the tokenizer lowercases and
+    # the embedders see the same words), so they shouldn't miss the cache.
+    cache_key = (
+        " ".join(request.question.lower().split()),
+        request.top_k,
+        as_of_date,
+        pipeline.config.name,
+    )
+    if cache is not None:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            trace = {
+                **cached.trace,
+                "cache": "hit",
+                "total_ms": round((time.perf_counter() - started) * 1000, 2),
+            }
+            return cached.model_copy(update={"question": request.question, "trace": trace})
+
     result = pipeline.search(request.question, top_k=request.top_k, as_of=as_of_date)
     graph = STATE["graph"]
 
@@ -183,11 +299,15 @@ async def query(request: QueryRequest):
                 snippet=hit.chunk.text[:400],
                 section=metadata.get("section"),
                 published=metadata.get("published"),
+                stage_scores={k: round(v, 5) for k, v in hit.stage_scores.items()},
             )
         )
 
     if not result.hits:
         warnings.append(empty_result_warning(as_of_date))
+
+    if result.skipped_stages:
+        warnings.append(skipped_stage_warning(pipeline.config.name, result.skipped_stages))
 
     if as_of_date is not None:
         undated = sum(1 for c in citations if c.published is None)
@@ -196,7 +316,7 @@ async def query(request: QueryRequest):
                 f"{undated} result(s) have no publication date and were not filtered by as-of"
             )
 
-    return QueryResponse(
+    response = QueryResponse(
         question=request.question,
         rewritten_query=result.rewritten_query,
         # Generation is intentionally not wired by default: an ungrounded
@@ -208,9 +328,14 @@ async def query(request: QueryRequest):
             "stage_latency_ms": {k: round(v, 2) for k, v in result.latency_ms.items()},
             "total_ms": round((time.perf_counter() - started) * 1000, 2),
             "config": pipeline.config.name,
+            "skipped_stages": result.skipped_stages,
+            "cache": "miss",
         },
         warnings=sorted(set(warnings)),
     )
+    if cache is not None:
+        cache.put(cache_key, response)
+    return response
 
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

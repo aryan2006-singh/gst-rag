@@ -45,6 +45,10 @@ USER_AGENT = (
 )
 
 # Circular / notification identifiers as they appear in link text and filenames.
+# CBIC GST circulars are numbered "<serial>/<series>/<year>-GST" (e.g.
+# 229/23/2024-GST). Without this pattern the shorter ones below match only the
+# "23/2024-GST" tail, which drops the serial and collides across circulars.
+GST_CIRCULAR_ID_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*/\s*(\d{4})\s*[-–]\s*GST\b", re.IGNORECASE)
 CIRCULAR_ID_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s*[-–]\s*(\d{4})", re.IGNORECASE)
 NOTIFICATION_ID_RE = re.compile(r"(\d+)\s*/\s*(\d{4})\s*[-–]?\s*([A-Z()\.\s]*)", re.IGNORECASE)
 DATE_RE = re.compile(r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})")
@@ -173,7 +177,11 @@ def extract_date(text: str) -> str | None:
 
 
 def extract_identifier(text: str) -> str | None:
-    match = CIRCULAR_ID_RE.search(text) or NOTIFICATION_ID_RE.search(text)
+    match = (
+        GST_CIRCULAR_ID_RE.search(text)
+        or CIRCULAR_ID_RE.search(text)
+        or NOTIFICATION_ID_RE.search(text)
+    )
     if not match:
         return None
     return re.sub(r"\s+", "", match.group(0)).upper().rstrip("-.")

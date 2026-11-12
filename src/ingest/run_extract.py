@@ -15,12 +15,73 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from pathlib import Path
 
 from src.ingest.pdf_extract import ExtractionReport, extract
 from src.retrieve.recency import build_supersession_graph
 
 log = logging.getLogger(__name__)
+
+MONTHS = {
+    name: number
+    for number, names in enumerate(
+        [("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"),
+         ("may",), ("jun", "june"), ("jul", "july"), ("aug", "august"),
+         ("sep", "sept", "september"), ("oct", "october"), ("nov", "november"),
+         ("dec", "december")],
+        start=1,
+    )
+    for name in names
+}
+
+# "dated the 10th September, 2024", "Dated: 24th June, 2025", "New Delhi, the
+# 27th March, 2025", "Dated - 09-06-2025". Only the document header is searched
+# (see infer_published), because the body cites other documents' dates.
+_DAY_MONTH_YEAR_RE = re.compile(
+    r"(?:dated?|new delhi)\W{0,6}(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?"
+    r"([a-z]{3,9})\.?,?\s+(\d{4})",
+    re.IGNORECASE,
+)
+_NUMERIC_RE = re.compile(
+    r"(?:dated?|new delhi)\W{0,6}(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})", re.IGNORECASE
+)
+
+
+def infer_published(text: str, header_chars: int = 1500) -> str | None:
+    """Issue date from a CBIC document header, as YYYY-MM-DD, or None.
+
+    Fallback for documents whose manifest entry has no date (hand-downloaded
+    PDFs, mostly). Without a date a document can't take part in as-of
+    filtering or the recency boost, so a conservative guess from the header is
+    worth having; anything that doesn't parse cleanly returns None.
+    """
+    header = re.sub(r"<[^>]+>|\*+", "", text[:header_chars])
+    # The issue date comes first; later dates in the header are usually the
+    # dates of earlier circulars being cited. So take the earliest match of
+    # either form, not the first form that matches anywhere.
+    candidates: list[tuple[int, str]] = []
+    for match in _DAY_MONTH_YEAR_RE.finditer(header):
+        day, month_name, year = match.groups()
+        month = MONTHS.get(month_name.lower())
+        iso = _iso(int(year), month, int(day)) if month else None
+        if iso:
+            candidates.append((match.start(), iso))
+    for match in _NUMERIC_RE.finditer(header):
+        day, month, year = (int(g) for g in match.groups())
+        iso = _iso(year, month, day)
+        if iso:
+            candidates.append((match.start(), iso))
+    return min(candidates)[1] if candidates else None
+
+
+def _iso(year: int, month: int, day: int) -> str | None:
+    from datetime import date
+
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
 
 
 def main() -> None:
@@ -70,6 +131,12 @@ def main() -> None:
         if len(extracted.text.split()) < args.min_words:
             dropped_short += 1
             continue
+
+        if not extracted.metadata.get("published"):
+            inferred = infer_published(extracted.text)
+            if inferred:
+                extracted.metadata["published"] = inferred
+                extracted.metadata["published_source"] = "document_header"
 
         documents.append(
             {

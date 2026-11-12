@@ -13,6 +13,7 @@ recorded fingerprint you will lose a day to it.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import time
 from dataclasses import asdict
@@ -25,9 +26,10 @@ from src.index.embedders import Embedder, HashingEmbedder
 
 
 def load_documents(path: str | Path) -> list[tuple[str, str, dict]]:
-    """JSONL with at least {doc_id, text}; anything else becomes chunk metadata."""
+    """JSONL (optionally .gz) with at least {doc_id, text}; anything else becomes chunk metadata."""
     documents: list[tuple[str, str, dict]] = []
-    with open(path, encoding="utf-8") as handle:
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line:
@@ -47,6 +49,10 @@ def make_embedder(kind: str, model_name: str | None = None, cache: bool = True) 
 
         inner = SentenceTransformerEmbedder(model_name or "BAAI/bge-small-en-v1.5")
         return CachedEmbedder(inner) if cache else inner
+    if kind == "fastembed":
+        from src.index.embedders import FastEmbedEmbedder
+
+        return FastEmbedEmbedder(model_name or "BAAI/bge-small-en-v1.5")
     raise ValueError(f"unknown embedder kind {kind!r}")
 
 

@@ -11,9 +11,8 @@ export default function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="container-x flex items-center justify-between gap-4 py-5">
-        <a href="#top" className="text-2xl font-medium tracking-tight text-amber" aria-label="gst-rag home">
-          /gst-rag
-        </a>
+        {/* Spacer keeps the section pill centred. */}
+        <span aria-hidden className="hidden w-[150px] md:block" />
 
         <nav
           aria-label="Sections"
@@ -31,7 +30,7 @@ export default function Nav() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 md:ml-0">
           <a href="#search" className="btn-light hidden sm:inline-flex">
             Ask a question <ArrowDot />
           </a>

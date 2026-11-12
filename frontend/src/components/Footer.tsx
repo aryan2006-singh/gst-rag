@@ -21,10 +21,6 @@ export default function Footer() {
             Source on GitHub
           </a>
         </div>
-
-        <p aria-hidden className="mt-14 select-none text-[clamp(64px,17vw,260px)] font-medium leading-[0.8] tracking-tightest text-white/[0.07]">
-          /gst-rag
-        </p>
       </div>
     </footer>
   );

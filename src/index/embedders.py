@@ -125,6 +125,48 @@ class SentenceTransformerEmbedder:
         return vectors.astype(np.float32)
 
 
+class FastEmbedEmbedder:
+    """The same bge/e5 models via ONNX Runtime (`fastembed`), with no torch.
+
+    sentence-transformers pulls in torch, which on its own is far bigger than
+    a small Render instance's memory. fastembed runs a quantised ONNX export of
+    the same model in ~100 MB of RAM, so the deployed app can do real dense
+    retrieval instead of falling back to the hashing embedder.
+
+    Prefixes follow `SentenceTransformerEmbedder`: an index built with one
+    can be queried with the other for the same model, though scores won't be
+    bit-identical (the ONNX export is quantised).
+    """
+
+    def __init__(
+        self,
+        model_name: str = "BAAI/bge-small-en-v1.5",
+        batch_size: int = 64,
+        threads: int | None = None,
+    ) -> None:
+        from fastembed import TextEmbedding
+
+        self.model = TextEmbedding(model_name, threads=threads)
+        self.model_name = model_name
+        self.name = model_name
+        self.batch_size = batch_size
+        self.family = SentenceTransformerEmbedder._family(model_name)
+        self.dim = int(next(iter(self.model.embed(["dimension probe"]))).shape[0])
+
+    def encode(self, texts: list[str], is_query: bool = False) -> np.ndarray:
+        if not texts:
+            return np.zeros((0, self.dim), dtype=np.float32)
+        prefix = ""
+        if self.family != "none":
+            table = SentenceTransformerEmbedder.QUERY_PREFIXES if is_query else (
+                SentenceTransformerEmbedder.PASSAGE_PREFIXES
+            )
+            prefix = table[self.family]
+        prepared = [prefix + t for t in texts] if prefix else texts
+        vectors = np.stack(list(self.model.embed(prepared, batch_size=self.batch_size)))
+        return l2_normalize(vectors.astype(np.float32))
+
+
 class CachedEmbedder:
     """Disk-backed cache keyed by (model name, text).
 

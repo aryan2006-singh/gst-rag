@@ -35,7 +35,8 @@ export default function App() {
     fetchVariants()
       .then((fetched) => {
         setVariants(fetched);
-        const preferred = fetched.find((v) => v.name === "Hybrid + reranker");
+        const preferred =
+          fetched.find((v) => v.default) ?? fetched.find((v) => v.name === "Hybrid + reranker");
         setSelectedVariant((preferred ?? fetched[0])?.name ?? "");
       })
       .catch((err) => setError(String(err)));

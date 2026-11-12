@@ -49,6 +49,10 @@ def make_embedder(kind: str, model_name: str | None = None, cache: bool = True) 
 
         inner = SentenceTransformerEmbedder(model_name or "BAAI/bge-small-en-v1.5")
         return CachedEmbedder(inner) if cache else inner
+    if kind == "fastembed":
+        from src.index.embedders import FastEmbedEmbedder
+
+        return FastEmbedEmbedder(model_name or "BAAI/bge-small-en-v1.5")
     raise ValueError(f"unknown embedder kind {kind!r}")
 
 

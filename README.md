@@ -116,6 +116,35 @@ optional). A missing publication date is read from the document header
 ("dated the 10th September, 2024"), so as-of filtering works on hand-downloaded
 files too.
 
+### What the deployed app runs, and why
+
+The Render image uses the hashing embedder, no reranker, and **BM25 only** as
+the default variant (`DEFAULT_VARIANT`). On a 16-question spot check against
+the starter corpus (counting a hit when the expected circular or FAQ is among
+the top documents), the variants scored:
+
+| Variant | Embedder | doc hit@1 | doc hit@5 | ms/query |
+|---|---|---|---|---|
+| BM25 only | none | 10/16 | **14/16** | 0.3 |
+| Hybrid (RRF) | hashing | 5/16 | 12/16 | 0.6 |
+| Dense only | `bge-small` via fastembed | **11/16** | 12/16 | 69 |
+| Hybrid (RRF) | `bge-small` via fastembed | 9/16 | 12/16 | 61 |
+
+Sixteen questions decide nothing statistically. They only show that hybrid
+with hashing embeddings, the previous default, was the worst real option. A
+real gold set and `make eval` are how to choose between BM25 and a learned
+embedder.
+
+`EMBEDDER=fastembed` runs the same `bge-small` model through ONNX Runtime with
+no torch, so it fits a small instance. Install it with `pip install fastembed`.
+Embedding the starter corpus took about 10 minutes on 4 CPU cores, so build
+that index ahead of time rather than in the Docker build.
+
+Other server settings: `QUERY_CACHE_SIZE` (default 256) caches responses in
+memory; `RATE_LIMIT_PER_MINUTE` (default 60, 0 turns it off) limits each
+client; `TRUSTED_PROXY_HOPS` (1 on Render) says how many X-Forwarded-For
+entries come from trusted proxies.
+
 Everything runs on CPU with no API keys. Embeddings are `BAAI/bge-small-en-v1.5`,
 reranking is `cross-encoder/ms-marco-MiniLM-L-6-v2`, and the judge is either
 heuristic or a small local NLI cross-encoder.
@@ -226,7 +255,7 @@ src/retrieve/      fusion, reranking, query rewriting, supersession/recency
 src/ingest/        CBIC scraper (rate-limited, cached), local-PDF manifests, PDF extraction taxonomy
 src/serve/         FastAPI + traced retrieval + status-labelled citations
 frontend/          React + Vite + TypeScript + Tailwind UI, served by src/serve/
-tests/             150 tests, all offline
+tests/             168 tests, all offline
 ```
 
 ## Test suite
@@ -237,7 +266,8 @@ tests/test_stats_and_agreement.py 25  CIs, permutation tests, kappa properties
 tests/test_pipeline.py            38  tokenizer, BM25, fusion, chunking, e2e, as_of
 tests/test_eval_harness.py        25  gold-set guardrails, ablation, judges
 tests/test_serve.py               5  request helpers, warnings, route precedence
-tests/test_serve_api.py           6  HTTP: stage scores, skipped stages, load failures
+tests/test_serve_api.py           9  HTTP: stage scores, skipped stages, load failures, default variant
+tests/test_limits.py             15  response cache, token-bucket rate limit, X-Forwarded-For
 tests/test_ingest_local.py       27  local-PDF manifests, circular ids, header dates
 ```
 

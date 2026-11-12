@@ -115,3 +115,41 @@ def test_lifespan_records_load_error_instead_of_crashing(monkeypatch):
     with TestClient(app_module.app) as client:
         assert client.get("/health").json()["status"] == "error"
     assert state["error"].startswith("FileNotFoundError")
+
+
+def test_variants_mark_default_and_unavailable(client_with):
+    client = client_with(make_state(reranker=None))
+    rows = {v["name"]: v for v in client.get("/variants").json()}
+    assert rows["Hybrid (RRF)"]["default"] is True
+    assert sum(v["default"] for v in rows.values()) == 1
+    assert rows["Hybrid + reranker"]["available"] is False
+    assert rows["BM25 only"]["available"] is True
+
+
+def test_default_variant_env_is_validated(monkeypatch):
+    monkeypatch.setenv("DEFAULT_VARIANT", "no such variant")
+    monkeypatch.setenv("RERANK", "0")
+    monkeypatch.setattr(app_module, "STATE", {})
+    import src.index.build as build
+
+    monkeypatch.setattr(build, "load_index", lambda *a, **k: make_index())
+    with pytest.raises(ValueError, match="DEFAULT_VARIANT"):
+        app_module.load_state()
+
+
+def test_default_variant_env_selects_the_pipeline(monkeypatch):
+    monkeypatch.setenv("DEFAULT_VARIANT", "BM25 only")
+    monkeypatch.setenv("RERANK", "0")
+    state: dict = {}
+    monkeypatch.setattr(app_module, "STATE", state)
+    import src.index.build as build
+
+    monkeypatch.setattr(build, "load_index", lambda *a, **k: make_index())
+    app_module.load_state()
+    assert state["pipeline"].config.name == "BM25 only"
+
+
+def make_index():
+    chunks = chunk_corpus(DOCUMENTS, "section")
+    embedder = HashingEmbedder(dim=256)
+    return chunks, embedder.encode([c.text for c in chunks]), embedder

@@ -116,11 +116,16 @@ def load_state() -> None:
 
         reranker = CrossEncoderReranker()
 
-    best = next(c for c in ABLATION_LADDER if c.name == "Hybrid + reranker")
+    variants = {c.name: c for c in ABLATION_LADDER}
+    default_name = os.environ.get("DEFAULT_VARIANT") or (
+        "Hybrid + reranker" if reranker else "Hybrid (RRF)"
+    )
+    if default_name not in variants:
+        raise ValueError(f"DEFAULT_VARIANT {default_name!r} is not one of {sorted(variants)}")
     STATE["pipeline"] = RetrievalPipeline(
         chunks=chunks,
         embedder=embedder,
-        config=best if reranker else ABLATION_LADDER[2],
+        config=variants[default_name],
         reranker=reranker,
         query_rewriter=rewrite,
         embeddings=embeddings,
@@ -128,7 +133,7 @@ def load_state() -> None:
     STATE["graph"] = build_supersession_graph(
         [(c.doc_id, c.text) for c in chunks]
     )
-    STATE["variants"] = {c.name: c for c in ABLATION_LADDER}
+    STATE["variants"] = variants
     STATE["started"] = time.time()
 
 
@@ -153,7 +158,7 @@ async def health():
     }
 
 
-def variant_summary(config: PipelineConfig) -> dict:
+def variant_summary(config: PipelineConfig, default: bool = False, available: bool = True) -> dict:
     return {
         "name": config.name,
         "use_bm25": config.use_bm25,
@@ -161,12 +166,29 @@ def variant_summary(config: PipelineConfig) -> dict:
         "rerank": config.rerank,
         "query_rewrite": config.query_rewrite,
         "recency_boost": config.recency_boost,
+        # The variant /query uses when the request names none. The UI selects
+        # it on load, so the server, not the UI, decides what users see first.
+        "default": default,
+        # False when the variant needs a stage this server didn't load (a
+        # reranker, usually); querying it still works but skips that stage.
+        "available": available,
     }
 
 
 @app.get("/variants")
 async def variants():
-    return [variant_summary(c) for c in ABLATION_LADDER]
+    pipeline = STATE.get("pipeline")
+    if pipeline is None:
+        return [variant_summary(c) for c in ABLATION_LADDER]
+    return [
+        variant_summary(
+            c,
+            default=c.name == pipeline.config.name,
+            available=not (c.rerank and pipeline.reranker is None)
+            and not (c.query_rewrite and pipeline.query_rewriter is None),
+        )
+        for c in ABLATION_LADDER
+    ]
 
 
 # NOTE: the exact wording of the warning strings below (here and in the

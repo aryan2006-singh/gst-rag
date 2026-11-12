@@ -40,6 +40,8 @@ def test_variant_summary_reports_config_flags():
         "rerank": True,
         "query_rewrite": True,
         "recency_boost": 0.0,
+        "default": False,
+        "available": True,
     }
 
 

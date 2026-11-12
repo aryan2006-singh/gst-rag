@@ -34,6 +34,9 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 ENV EMBEDDER=hashing
 ENV RERANK=0
+# With the hashing embedder, BM25 alone beats hybrid on the starter corpus
+# (top-5 doc hit 14/16 vs 12/16 on a 16-question spot check; see README).
+ENV DEFAULT_VARIANT="BM25 only"
 ENV INDEX_DIR=data/index_cbic
 # Render puts one proxy in front of the app; its X-Forwarded-For entry is the
 # one to rate-limit on (see src/serve/limits.py:client_key).

@@ -40,4 +40,6 @@ export interface Variant {
   rerank: boolean;
   query_rewrite: boolean;
   recency_boost: number;
+  default?: boolean;
+  available?: boolean;
 }

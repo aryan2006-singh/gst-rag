@@ -8,6 +8,9 @@ interface ControlsBarProps {
   onAsOfChange: (value: string) => void;
 }
 
+const field =
+  "rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none";
+
 export default function ControlsBar({
   variants,
   selectedVariant,
@@ -16,17 +19,20 @@ export default function ControlsBar({
   onAsOfChange,
 }: ControlsBarProps) {
   const active = variants.find((variant) => variant.name === selectedVariant);
+  const parts = active
+    ? [
+        active.use_bm25 && "BM25",
+        active.use_dense && "dense",
+        active.rerank && "reranker",
+        active.query_rewrite && "rewrite",
+      ].filter(Boolean)
+    : [];
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
-      <label className="flex items-center gap-2">
-        <span className="text-slate-500 dark:text-slate-400">Variant</span>
-        <select
-          value={selectedVariant}
-          onChange={(event) => onVariantChange(event.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1
-                     dark:border-slate-700 dark:bg-slate-900"
-        >
+    <div className="mt-6 flex flex-wrap items-end gap-x-6 gap-y-4 border-t border-line pt-6 text-sm">
+      <label className="flex flex-col gap-2">
+        <span className="eyebrow text-[10px] text-muted">Retrieval</span>
+        <select value={selectedVariant} onChange={(event) => onVariantChange(event.target.value)} className={field}>
           {variants.map((variant) => (
             <option key={variant.name} value={variant.name} disabled={variant.available === false}>
               {variant.name}
@@ -35,37 +41,22 @@ export default function ControlsBar({
           ))}
         </select>
       </label>
-      {active && (
-        <span className="text-xs text-slate-400">
-          {[
-            active.use_bm25 && "BM25",
-            active.use_dense && "dense",
-            active.rerank && "reranker",
-            active.query_rewrite && "rewrite",
-          ]
-            .filter(Boolean)
-            .join(" + ")}
+
+      <label className="flex flex-col gap-2">
+        <span className="eyebrow text-[10px] text-muted">As of</span>
+        <span className="flex items-center gap-2">
+          <input type="date" value={asOf} onChange={(event) => onAsOfChange(event.target.value)} className={field} />
+          {asOf && (
+            <button type="button" onClick={() => onAsOfChange("")} className="text-xs text-muted underline">
+              clear
+            </button>
+          )}
         </span>
-      )}
-      <label className="flex items-center gap-2">
-        <span className="text-slate-500 dark:text-slate-400">As of</span>
-        <input
-          type="date"
-          value={asOf}
-          onChange={(event) => onAsOfChange(event.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1
-                     dark:border-slate-700 dark:bg-slate-900"
-        />
-        {asOf && (
-          <button
-            type="button"
-            onClick={() => onAsOfChange("")}
-            className="text-xs text-slate-400 underline"
-          >
-            clear
-          </button>
-        )}
       </label>
+
+      {parts.length > 0 && (
+        <span className="pb-2 font-mono text-xs text-muted">{parts.join(" + ")}</span>
+      )}
     </div>
   );
 }

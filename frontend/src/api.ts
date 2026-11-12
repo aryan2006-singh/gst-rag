@@ -32,3 +32,13 @@ export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
   });
   return parseJsonOrThrow<QueryResponse>(response);
 }
+
+export interface Health {
+  status: string;
+  n_chunks?: number;
+}
+
+export async function fetchHealth(): Promise<Health> {
+  const response = await fetch("/health");
+  return parseJsonOrThrow<Health>(response);
+}

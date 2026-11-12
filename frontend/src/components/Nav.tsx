@@ -11,9 +11,7 @@ export default function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="container-x flex items-center justify-between gap-4 py-5">
-        <a href="#top" className="text-2xl font-medium tracking-tight text-amber" aria-label="gst-rag home">
-          /gst-rag
-        </a>
+        <span aria-hidden className="w-px" />
 
         <nav
           aria-label="Sections"
